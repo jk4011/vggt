@@ -21,7 +21,7 @@ from .layer_scale import LayerScale
 from .mlp import Mlp
 
 
-XFORMERS_AVAILABLE = False
+XFORMERS_AVAILABLE = True
 
 
 class Block(nn.Module):

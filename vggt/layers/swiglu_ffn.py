@@ -46,7 +46,7 @@ XFORMERS_ENABLED = os.environ.get("XFORMERS_DISABLED") is None
 #         raise ImportError
 # except ImportError:
 SwiGLU = SwiGLUFFN
-XFORMERS_AVAILABLE = False
+XFORMERS_AVAILABLE = True
 
 # warnings.warn("xFormers is not available (SwiGLU)")
 
