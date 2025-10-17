@@ -15,7 +15,7 @@ from torch import Tensor
 from torch import nn
 import torch.nn.functional as F
 
-XFORMERS_AVAILABLE = True
+XFORMERS_AVAILABLE = False
 
 
 class Attention(nn.Module):

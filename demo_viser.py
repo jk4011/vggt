@@ -24,16 +24,16 @@ try:
 except ImportError:
     print("onnxruntime not found. Sky segmentation may not work.")
 
-from visual_util import segment_sky, download_file_from_url
 from vggt.models.vggt import VGGT
 from vggt.utils.load_fn import load_and_preprocess_images
 from vggt.utils.geometry import closed_form_inverse_se3, unproject_depth_map_to_point_map
 from vggt.utils.pose_enc import pose_encoding_to_extri_intri
+from vggt.visual_util import segment_sky, download_file_from_url
 
 
 def viser_wrapper(
     pred_dict: dict,
-    port: int = 8080,
+    port: int = 8081,
     init_conf_threshold: float = 50.0,  # represents percentage (e.g., 50 means filter lowest 50%)
     use_point_map: bool = False,
     background_mode: bool = False,
@@ -311,11 +311,15 @@ parser.add_argument(
 )
 parser.add_argument("--use_point_map", action="store_true", help="Use point map instead of depth-based points")
 parser.add_argument("--background_mode", action="store_true", help="Run the viser server in background mode")
-parser.add_argument("--port", type=int, default=8080, help="Port number for the viser server")
+parser.add_argument("--port", type=int, default=8081, help="Port number for the viser server")
 parser.add_argument(
     "--conf_threshold", type=float, default=25.0, help="Initial percentage of low-confidence points to filter out"
 )
 parser.add_argument("--mask_sky", action="store_true", help="Apply sky segmentation to filter out sky points")
+parser.add_argument("--n_images", type=int, default=-1, help="Number of images to use for visualization")
+parser.add_argument(
+    "--save_path", type=str, default=None, help="Path to save predictions"
+)
 
 
 def main():
@@ -346,7 +350,7 @@ def main():
 
     model = VGGT()
     _URL = "https://huggingface.co/facebook/VGGT-1B/resolve/main/model.pt"
-    model.load_state_dict(torch.hub.load_state_dict_from_url(_URL))
+    model.load_state_dict(torch.hub.load_state_dict_from_url(_URL, model_dir="/root/data1/jinhyeok/checkpoints/vggt"))
 
     model.eval()
     model = model.to(device)
@@ -354,6 +358,12 @@ def main():
     # Use the provided image folder path
     print(f"Loading images from {args.image_folder}...")
     image_names = glob.glob(os.path.join(args.image_folder, "*"))
+    
+    if args.n_images > 0 and args.n_images < len(image_names):
+        image_indices = np.linspace(0, len(image_names) - 1, args.n_images).astype(int)
+        image_names = [image_names[i] for i in image_indices]
+        
+
     print(f"Found {len(image_names)} images")
 
     images = load_and_preprocess_images(image_names).to(device)
@@ -385,6 +395,9 @@ def main():
         print("Sky segmentation enabled - will filter out sky points")
 
     print("Starting viser visualization...")
+
+    if args.save_path:
+        torch.save(predictions, args.save_path)
 
     viser_server = viser_wrapper(
         predictions,
