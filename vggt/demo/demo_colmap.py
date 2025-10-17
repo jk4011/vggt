@@ -71,6 +71,7 @@ def run_VGGT(model, images, dtype, resolution=518):
     # hard-coded to use 518 for VGGT
     images = F.interpolate(images, size=(resolution, resolution), mode="bilinear", align_corners=False)
 
+
     with torch.no_grad():
         with torch.cuda.amp.autocast(dtype=dtype):
             images = images[None]  # add batch dimension
