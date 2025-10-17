@@ -1,1 +1,0 @@
-python demo_viser.py --image_folder examples/kitchen/
