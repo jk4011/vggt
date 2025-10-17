@@ -1,0 +1,1 @@
+from .vggt_inference import vggt_inference

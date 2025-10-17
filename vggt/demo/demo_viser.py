@@ -29,7 +29,7 @@ from vggt.utils.load_fn import load_and_preprocess_images
 from vggt.utils.geometry import closed_form_inverse_se3, unproject_depth_map_to_point_map
 from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 from vggt.visual_util import segment_sky, download_file_from_url
-
+from vggt import vggt_inference
 
 def viser_wrapper(
     pred_dict: dict,
@@ -306,20 +306,16 @@ def apply_sky_segmentation(conf: np.ndarray, image_folder: str) -> np.ndarray:
 
 
 parser = argparse.ArgumentParser(description="VGGT demo with viser for 3D visualization")
-parser.add_argument(
-    "--image_folder", type=str, default="examples/kitchen/images/", help="Path to folder containing images"
-)
+parser.add_argument("--image_folder", type=str, default="examples/kitchen/images/", help="Path to folder containing images")
 parser.add_argument("--use_point_map", action="store_true", help="Use point map instead of depth-based points")
 parser.add_argument("--background_mode", action="store_true", help="Run the viser server in background mode")
 parser.add_argument("--port", type=int, default=8081, help="Port number for the viser server")
-parser.add_argument(
-    "--conf_threshold", type=float, default=25.0, help="Initial percentage of low-confidence points to filter out"
-)
+parser.add_argument("--conf_threshold", type=float, default=25.0, help="Initial percentage of low-confidence points to filter out")
 parser.add_argument("--mask_sky", action="store_true", help="Apply sky segmentation to filter out sky points")
 parser.add_argument("--n_images", type=int, default=-1, help="Number of images to use for visualization")
-parser.add_argument(
-    "--save_path", type=str, default=None, help="Path to save predictions"
-)
+parser.add_argument("--save_path", type=str, default=None, help="Path to save predictions")
+parser.add_argument("--visualize_cache_file", type=str, default=None, help="Path to cached predictions")
+parser.add_argument("--skip_visualization", action="store_true", help="Skip visualization and only save predictions")
 
 
 def main():
@@ -342,73 +338,40 @@ def main():
     --mask_sky: Apply sky segmentation to filter out sky points
     """
     args = parser.parse_args()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
 
-    print("Initializing and loading VGGT model...")
-    # model = VGGT.from_pretrained("facebook/VGGT-1B")
+    if args.visualize_cache_file:
+        predictions = torch.load(args.visualize_cache_file)
 
-    model = VGGT()
-    _URL = "https://huggingface.co/facebook/VGGT-1B/resolve/main/model.pt"
-    model.load_state_dict(torch.hub.load_state_dict_from_url(_URL, model_dir="/root/data1/jinhyeok/checkpoints/vggt"))
-
-    model.eval()
-    model = model.to(device)
-
-    # Use the provided image folder path
-    print(f"Loading images from {args.image_folder}...")
-    image_names = glob.glob(os.path.join(args.image_folder, "*"))
-    
-    if args.n_images > 0 and args.n_images < len(image_names):
-        image_indices = np.linspace(0, len(image_names) - 1, args.n_images).astype(int)
-        image_names = [image_names[i] for i in image_indices]
-        
-
-    print(f"Found {len(image_names)} images")
-
-    images = load_and_preprocess_images(image_names).to(device)
-    print(f"Preprocessed images shape: {images.shape}")
-
-    print("Running inference...")
-    dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
-
-    with torch.no_grad():
-        with torch.cuda.amp.autocast(dtype=dtype):
-            predictions = model(images)
-
-    print("Converting pose encoding to extrinsic and intrinsic matrices...")
-    extrinsic, intrinsic = pose_encoding_to_extri_intri(predictions["pose_enc"], images.shape[-2:])
-    predictions["extrinsic"] = extrinsic
-    predictions["intrinsic"] = intrinsic
-
-    print("Processing model outputs...")
-    for key in predictions.keys():
-        if isinstance(predictions[key], torch.Tensor):
-            predictions[key] = predictions[key].cpu().numpy().squeeze(0)  # remove batch dimension and convert to numpy
-
-    if args.use_point_map:
-        print("Visualizing 3D points from point map")
     else:
-        print("Visualizing 3D points by unprojecting depth map by cameras")
+        predictions = vggt_inference(args.image_folder, args.n_images, args.save_path)
 
-    if args.mask_sky:
-        print("Sky segmentation enabled - will filter out sky points")
+    if not args.skip_visualization:
 
-    print("Starting viser visualization...")
+        print("Processing model outputs...")
+        for key in predictions.keys():
+            if isinstance(predictions[key], torch.Tensor):
+                predictions[key] = predictions[key].cpu().numpy().squeeze(0)  # remove batch dimension and convert to numpy
 
-    if args.save_path:
-        torch.save(predictions, args.save_path)
+        if args.use_point_map:
+            print("Visualizing 3D points from point map")
+        else:
+            print("Visualizing 3D points by unprojecting depth map by cameras")
 
-    viser_server = viser_wrapper(
-        predictions,
-        port=args.port,
-        init_conf_threshold=args.conf_threshold,
-        use_point_map=args.use_point_map,
-        background_mode=args.background_mode,
-        mask_sky=args.mask_sky,
-        image_folder=args.image_folder,
-    )
-    print("Visualization complete")
+        if args.mask_sky:
+            print("Sky segmentation enabled - will filter out sky points")
+
+        print("Starting viser visualization...")
+
+        viser_server = viser_wrapper(
+            predictions,
+            port=args.port,
+            init_conf_threshold=args.conf_threshold,
+            use_point_map=args.use_point_map,
+            background_mode=args.background_mode,
+            mask_sky=args.mask_sky,
+            image_folder=args.image_folder,
+        )
+        print("Visualization complete")
 
 
 if __name__ == "__main__":
