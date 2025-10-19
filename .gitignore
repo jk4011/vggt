@@ -149,3 +149,4 @@ skyseg.onnx
 *.egg-info
 
 tmp*
+result
