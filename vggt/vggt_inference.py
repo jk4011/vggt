@@ -53,7 +53,8 @@ def unload_model():
         torch.cuda.empty_cache()
 
 
-def vggt_inference(image_folder: str, n_images: int = -1, save_path: str = None) -> dict:
+@cache_output(func_name="vggt_inference")
+def vggt_inference(image_folder: str, n_images: int = -1) -> dict:
     if model is None:
         load_model()
         
@@ -84,9 +85,6 @@ def vggt_inference(image_folder: str, n_images: int = -1, save_path: str = None)
     predictions["intrinsic"] = intrinsic
 
     print("Processing model outputs...")
-
-    if save_path is not None:
-        torch.save(predictions, save_path)
 
     return predictions
 

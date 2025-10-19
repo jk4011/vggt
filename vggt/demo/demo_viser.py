@@ -313,7 +313,6 @@ parser.add_argument("--port", type=int, default=8081, help="Port number for the 
 parser.add_argument("--conf_threshold", type=float, default=25.0, help="Initial percentage of low-confidence points to filter out")
 parser.add_argument("--mask_sky", action="store_true", help="Apply sky segmentation to filter out sky points")
 parser.add_argument("--n_images", type=int, default=-1, help="Number of images to use for visualization")
-parser.add_argument("--save_path", type=str, default=None, help="Path to save predictions")
 parser.add_argument("--visualize_cache_file", type=str, default=None, help="Path to cached predictions")
 parser.add_argument("--skip_visualization", action="store_true", help="Skip visualization and only save predictions")
 
@@ -343,7 +342,7 @@ def main():
         predictions = torch.load(args.visualize_cache_file)
 
     else:
-        predictions = vggt_inference(args.image_folder, args.n_images, args.save_path)
+        predictions = vggt_inference(args.image_folder, args.n_images)
 
     if not args.skip_visualization:
 
