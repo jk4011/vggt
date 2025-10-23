@@ -53,30 +53,14 @@ def unload_model():
         torch.cuda.empty_cache()
 
 
-@cache_output(func_name="vggt_inference")
-def vggt_inference(image_folder: str, n_images: int = -1) -> dict:
-    if model is None:
-        load_model()
-        
-    # Use the provided image folder path
-    print(f"Loading images from {image_folder}...")
-    image_names = glob.glob(os.path.join(image_folder, "*"))
-    
-    if n_images > 0 and n_images < len(image_names):
-        image_indices = np.linspace(0, len(image_names) - 1, n_images).astype(int)
-        image_names = [image_names[i] for i in image_indices]
-        
-
-    print(f"Found {len(image_names)} images")
+@cache_output(func_name="_vggt_inference", override=False)
+def _vggt_inference(image_names: list=None, precision=torch.float32) -> dict:
 
     images = load_and_preprocess_images(image_names).to(device)
     print(f"Preprocessed images shape: {images.shape}")
 
-    print("Running inference...")
-    dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
-
     with torch.no_grad():
-        with torch.cuda.amp.autocast(dtype=dtype):
+        with torch.amp.autocast(device_type="cuda", dtype=precision, enabled=False):
             predictions = model(images)
 
     print("Converting pose encoding to extrinsic and intrinsic matrices...")
@@ -84,9 +68,36 @@ def vggt_inference(image_folder: str, n_images: int = -1) -> dict:
     predictions["extrinsic"] = extrinsic
     predictions["intrinsic"] = intrinsic
 
+    for key in predictions.keys():
+        if isinstance(predictions[key], torch.Tensor):
+            predictions[key] = predictions[key].squeeze(0)
+    
     print("Processing model outputs...")
 
     return predictions
+
+
+def vggt_inference(image_folder: str=None, image_names: list=None, n_images: int = -1, precision=torch.float32) -> dict:
+    if model is None:
+        load_model()
+        
+    # Use the provided image folder path
+    print(f"Loading images from {image_folder}...")
+    if image_names is None:
+        image_names = glob.glob(os.path.join(image_folder, "*"))
+        try:
+            image_names.sort(key=lambda p: int(os.path.splitext(p)[0]))
+        except:
+            image_names.sort(key=lambda p: os.path.splitext(p)[0])
+    
+    if n_images > 0 and n_images < len(image_names):
+        image_indices = np.linspace(0, len(image_names) - 1, n_images).astype(int)
+        image_names = [image_names[i] for i in image_indices]
+    
+    print(f"Found {len(image_names)} images")
+    return _vggt_inference(image_names, precision)
+        
+
 
 if __name__ == "__main__":
     main()

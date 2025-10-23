@@ -342,14 +342,14 @@ def main():
         predictions = torch.load(args.visualize_cache_file)
 
     else:
-        predictions = vggt_inference(args.image_folder, args.n_images)
+        predictions = vggt_inference(image_folder=args.image_folder, n_images=args.n_images)
 
     if not args.skip_visualization:
 
         print("Processing model outputs...")
         for key in predictions.keys():
             if isinstance(predictions[key], torch.Tensor):
-                predictions[key] = predictions[key].cpu().numpy().squeeze(0)  # remove batch dimension and convert to numpy
+                predictions[key] = predictions[key].cpu().numpy()  # remove batch dimension and convert to numpy
 
         if args.use_point_map:
             print("Visualizing 3D points from point map")
