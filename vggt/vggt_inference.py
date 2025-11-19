@@ -29,11 +29,12 @@ from vggt.utils.load_fn import load_and_preprocess_images
 from vggt.utils.geometry import closed_form_inverse_se3, unproject_depth_map_to_point_map
 from vggt.utils.pose_enc import pose_encoding_to_extri_intri
 from vggt.visual_util import segment_sky, download_file_from_url
-from jhutil import cache_output
+from jhutil import cache_output, print_time
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = None
 
+@print_time(func_name="load_vggt_model")
 def load_model():
     global model
     if model is None:
@@ -55,11 +56,13 @@ def unload_model():
 
 @cache_output(func_name="_vggt_inference", override=False)
 def _vggt_inference(image_names: list=None, precision=torch.float32) -> dict:
+    if model is None:
+        load_model()
 
     images = load_and_preprocess_images(image_names).to(device)
     print(f"Preprocessed images shape: {images.shape}")
 
-    with torch.no_grad():
+    with torch.inference_mode(), print_time(func_name="vggt inference"):
         with torch.amp.autocast(device_type="cuda", dtype=precision, enabled=False):
             predictions = model(images)
 
@@ -78,8 +81,6 @@ def _vggt_inference(image_names: list=None, precision=torch.float32) -> dict:
 
 
 def vggt_inference(image_folder: str=None, image_names: list=None, n_images: int = -1, precision=torch.float32) -> dict:
-    if model is None:
-        load_model()
         
     # Use the provided image folder path
     print(f"Loading images from {image_folder}...")
